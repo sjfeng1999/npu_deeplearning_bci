@@ -1,11 +1,11 @@
 import datetime
-
+import random
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tensorboardX import SummaryWriter
-
+from sklearn.model_selection import train_test_split
 import env
 from rl_method import preprocess
 
@@ -96,13 +96,14 @@ class ADAgent:
         data,
         label,
         reward_model_path,
+        save_path,
         gamma=1,
         epsilon=0.3,
         max_drop=7,
         buffer_size=2000,
         batch_size=2,
         train_epoch=1000,
-        drop_reward=0.0001
+        drop_reward=0.0001,
     ):
 
         self.gamma = gamma
@@ -111,17 +112,23 @@ class ADAgent:
         self.train_epoch = train_epoch
         self.batch_size = batch_size
         self.check_step = 100
+        self.save_path = save_path
 
         tdata, vdata, tlabel, vlabel = train_test_split(data, label, test_size=0.2)
-        self.env = env.DropEnv(tdata, vdata, tlabel, vlabel, drop_reward, reward_model_path)
-
+        self.env = env.DropEnv(tdata,
+                               vdata,
+                               tlabel,
+                               vlabel,
+                               drop_reward,
+                               reward_model_path
+                               )
         self.device = torch.device('cuda')
         self.eval_net = Q_Net(data.shape[-1])
         self.eval_net_gpu = Q_Net(data.shape[-1]).to(self.device)
 
         self.val_net = preprocess.get_reward_net(data[0].shape[-1], reward_model_path)
         self.memory = ReplayBuffer(buffer_size)
-        self.writer = SummaryWriter("adrl-runs/ADAgent_" + str(datetime.datetime.now()))
+        self.writer = SummaryWriter("runs/ADAgent_" + str(datetime.datetime.now()))
 
         self.interaction_counter = 0
         self.validation_counter = 0
@@ -231,9 +238,9 @@ class ADAgent:
 
 
     def save(self, filename):
-        torch.save(self.eval_net.state_dict(), filename + "_Q_net" + str(datetime.datetime.now()))
-        torch.save(self.optimizer.state_dict(), filename + "_optimizer_" + str(datetime.datetime.now()))
+        torch.save(self.eval_net.state_dict(), filename + "_Q_net" + str(datetime.datetime.now()) + '.pth')
+        torch.save(self.optimizer.state_dict(), filename + "_optimizer_" + str(datetime.datetime.now()) + '.pth')
 
     def load(self, filename):
-        self.eval_net.load_state_dict(torch.load(filename + "_Q_net"))
-        self.optimizer.load_state_dict(torch.load(filename + "_optimizer"))
+        self.eval_net.load_state_dict(torch.load(filename + "_Q_net.pth"))
+        self.optimizer.load_state_dict(torch.load(filename + "_optimizer.pth"))

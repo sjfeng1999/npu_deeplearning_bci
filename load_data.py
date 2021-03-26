@@ -14,8 +14,6 @@ from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 import utils
 
-PATH = '/home/willer/Desktop/Development/Python/dataset/grazdata/'
-
 
 def label_map(x, pos=0, classes=2):
     if x[pos] >= 5:

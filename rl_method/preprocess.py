@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
 import copy
 
 sys.path.append("..")
@@ -19,44 +20,6 @@ def boost_dataloader(data, label, batch_size=128, test_size=0.20):
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True)
 
     return train_loader, test_loader
-
-
-# input the pretrained model encode the origin signal data
-def encode_data(model_path, rdata: np.array, rlabel: np.array):
-    enet = EncodeNet()
-    pnet = PretrainNet()
-    pnet.load_state_dict(torch.load(model_path))
-
-    enet_dict = enet.state_dict()
-    for (name, param) in enet_dict.items():
-        enet_dict[name] = copy.deepcopy(pnet.state_dict()[name])
-    enet.load_state_dict(enet_dict)
-    enet.eval()
-    enet.to(torch.device('cuda'))
-
-    n_classes = 2
-    train_loader, test_loader = boost_dataloader(rdata, rlabel, batch_size=512)
-    with torch.no_grad():
-        for input, label in train_loader:
-            output = enet(input).cpu().numpy()
-            label = label.cpu().numpy().reshape(-1)
-            vec_label = np.eye(n_classes)[label]
-            if str(type(ndata)) == "<class 'NoneType'>":
-                ndata = output
-                nlabel = vec_label
-            else:
-                ndata = np.concatenate([ndata, output], 0)
-                nlabel = np.concatenate([nlabel, vec_label], 0)
-
-        for input, label in test_loader:
-            output = enet(input).cpu().numpy()
-            label = label.cpu().numpy().reshape(-1)
-            vec_label = np.eye(n_classes)[label]
-
-            ndata = np.concatenate([ndata, output], 0)
-            nlabel = np.concatenate([nlabel, vec_label], 0)
-
-    return ndata, nlabel
 
 
 def train_pretrainnet(save_path):

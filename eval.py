@@ -13,6 +13,10 @@ from collections import deque
 from sklearn import preprocessing
 from sklearn.preprocessing import normalize
 
+def record_process(index, timestamp):
+    pass
+
+
 if __name__ == '__main__':
     parse = argparse.ArgumentParser()
     parse.add_argument('-model', type=str, required=True)
@@ -54,6 +58,9 @@ if __name__ == '__main__':
     else:
         raise ValueError("Undefined Model")
 
+    model_dict = torch.load(args.model_path)
+    net.load_state_dict(model_dict['net'])
+
     threshold = args.threshold
     ax = deque(maxlen=args.windows_lens)
     ay = deque(maxlen=args.windows_lens)
@@ -81,6 +88,7 @@ if __name__ == '__main__':
                 last_time = timestamp
             if confuse_index <= threshold and confuse_now:
                 confuse_now = False
+
                 confuse_time.append([last_time, timestamp])
             plt.clf()
             plt.plot(ax,ay)

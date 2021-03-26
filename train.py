@@ -89,7 +89,6 @@ if __name__ == '__main__':
             train_correct += (train_prediction == label).sum().float()
             train_total += len(label)
 
-            print(label.shape, torch.sum(label), torch.sum(train_prediction))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -106,8 +105,6 @@ if __name__ == '__main__':
             test_correct += (test_prediction == label).sum().float()
             test_f1score = f1_score(label.cpu().numpy(), test_prediction.cpu().numpy(), average='binary')
             test_total += len(label)
-
-            print(label.shape, torch.sum(label), torch.sum(test_prediction))
 
         print('EPOCH :{:}  loss : {:.5}/{:.5}  acc:{:.3}/{:.3}, f1-score:{:.3}'.format(i, train_loss, test_loss,
                                                                                        train_correct / train_total,

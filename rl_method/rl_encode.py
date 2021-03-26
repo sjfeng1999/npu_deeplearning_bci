@@ -1,34 +1,35 @@
 import numpy as np
 import argparse
+import preprocess
 import copy
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 
 if __name__ == '__main__':
     parse = argparse.ArgumentParser()
     parse.add_argument('-data', type=str, required=True)
     parse.add_argument('-label', type=str, required=True)
+    parse.add_argument('-model_path', type=str, required=True)
     parse.add_argument('-save_path', type=str, required=True)
+    args = parse.parse_args()
 
-    model_path = '/home/willer/Desktop/Development/Python/MyRepo/npu-deeplearning-bci/model/PretrainNet_T1.pkl'
     enet = preprocess.EncodeNet_T()
     pnet = preprocess.PretrainNet_T()
-    pnet.load_state_dict(torch.load(model_path))
-
+    pnet.load_state_dict(torch.load(args.model_path))
     enet_dict = enet.state_dict()
     for (name, param) in enet_dict.items():
         enet_dict[name] = copy.deepcopy(pnet.state_dict()[name])
     enet.load_state_dict(enet_dict)
     enet.eval()
 
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
     n_classes = 2
-    ndata, nlabel = load_data.get_grazdata()
-
     enet.to(torch.device('cuda'))
-    ndata = None
-    nlabel = None
+    ndata = np.load(args.data)
+    nlabel = np.load(args.label)
+    train_loader, test_loader = preprocess.boost_dataloader(ndata, nlabel)
     with torch.no_grad():
         for input, label in train_loader:
             output = enet(input).cpu().numpy()
@@ -50,5 +51,5 @@ if __name__ == '__main__':
             ndata = np.concatenate([ndata, output], 0)
             nlabel = np.concatenate([nlabel, vec_label], 0)
 
-    np.save('rl_method/encode_data/encode_data_tem1.npy', ndata)
-    np.save('rl_method/encode_data/encode_label_tem1.npy', nlabel)
+    np.save(args.save_path + '_data.npy', ndata)
+    np.save(args.save_path + '_label.npy', nlabel)

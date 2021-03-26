@@ -14,43 +14,32 @@ utils.set_random_seed(seed)
 np.set_printoptions(precision=4, suppress=True)
 
 
-def get_attention_distribution(f_size, t_size, s_size, test_loader):
+def get_attention_distribution(net, dim_size, test_loader):
 
-    f_1 = np.zeros(f_size, dtype=np.float)
-    f_0 = np.zeros(f_size, dtype=np.float)
-    t_1 = np.zeros(t_size, dtype=np.float)
-    t_0 = np.zeros(t_size, dtype=np.float)
-    s_1 = np.zeros(s_size, dtype=np.float)
-    s_0 = np.zeros(s_size, dtype=np.float)
+    f_1 = np.zeros(dim_size, dtype=np.float)
+    f_0 = np.zeros(dim_size, dtype=np.float)
+    f_t = np.zeros(dim_size, dtype=np.float)
 
     l1 = 0
     l0 = 0
     with torch.no_grad():
         for input, label in test_loader:
 
-            foutput, fattn = fnet(input)
-            soutput, sattn = snet(input)
-            toutput, tattn = tnet(input)
-
+            foutput, fattn = net(input)
             label = label.cpu().numpy()
             fattn = fattn.cpu().numpy()
-            sattn = sattn.cpu().numpy()
-            tattn = tattn.cpu().numpy()
 
             index_1 = np.where(label==1)[0]
             index_0 = np.where(label==0)[0]
-
             f_1 += fattn[index_1].sum(0)
             f_0 += fattn[index_0].sum(0)
-            s_1 += sattn[index_1].sum(0)
-            s_0 += sattn[index_0].sum(0)
-            t_1 += tattn[index_1].sum(0)
-            t_0 += tattn[index_0].sum(0)
+            f_t += fattn.sum(0)
 
             l1 += index_1.shape[0]
             l0 += index_0.shape[0]
 
-    return (f_1, f_0), (t_1, t_0), (s_1, s_0), (l1, l0)
+    print("Attention Distribution over feature dimension: \n", f_t)
+    return (f_1, f_0, f_t), (l1, l0)
 
 
 def get_single_attention(index, ndata=None):
@@ -67,13 +56,35 @@ if __name__ == '__main__':
     parse = argparse.ArgumentParser()
     parse.add_argument('-data', type=str, required=True)
     parse.add_argument('-dim', type=str, required=True)
+    parse.add_argument('-dim_size', type=int, required=True)
     parse.add_argument('-model_path', type=str, required=True)
+    args = parse.parse_args()
 
-    ndata, nlabel = load_data.get_grazdata()
-    train_loader, test_loader = load_data.get_dataloader_graz()
-    fnet = model.FrequencyAttentionNet().to(device)
-    fnet.load_state_dict(torch.load(PATH + 'FrequencyAttentionNet_feature_withLSTM.pkl'))
-    snet = model.SpacialAttentionNet().to(device)
-    snet.load_state_dict(torch.load(PATH + 'SpacialAttentionNet_feature_withLSTM.pkl'))
-    tnet = model.TemporalAttentionNet().to(device)
-    tnet.load_state_dict(torch.load(PATH + 'TemporalAttentionNet_feature_withLSTM.pkl'))
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
+    if args.dim == 'time':
+        net = model.TemporalAttentionNet(
+            in_channel=args.channel,
+            sequence_lens=args.sequences_lens,
+            time_lens=args.time_lens,
+            hidden_size=256
+        ).to(device)
+    elif args.dim == 'space':
+        net = model.SpacialAttentionNet(
+            in_channel=args.channel,
+            sequence_lens=args.sequences_lens,
+            time_lens=args.time_lens,
+            hidden_size=256
+        ).to(device)
+    else:
+        raise ValueError("Undefined Dimension")
+    ndata = np.load(args.data)
+    nlabel = np.load(args.label)
+
+    train_loader, test_loader = load_data.boost_dataloader(ndata, nlabel)
+    model_dict = torch.load(args.model_path)
+    net.load_state_dict(model_dict['net'])
+    attn_distribution, label_distribution = get_attention_distribution(net, args.dim_size, test_loader)

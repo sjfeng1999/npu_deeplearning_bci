@@ -8,18 +8,19 @@ import numpy as np
 from torch import nn
 from torch import optim
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
 
 from sklearn.metrics import f1_score
 import datetime
 from tensorboardX import SummaryWriter
-
 
 if __name__ == '__main__':
     parse = argparse.ArgumentParser()
     parse.add_argument('-data', type=str, required=True)
     parse.add_argument('-label', type=str, required=True)
     parse.add_argument('-dim', type=str, required=True)
+    parse.add_argument('-channel', type=int, required=True)
+    parse.add_argument('-sequences_lens', type=int, required=True)
+    parse.add_argument('-time_lens', type=int, required=True)
     parse.add_argument('-save_path', type=str, required=True)
 
     parse.add_argument('-epoch', type=int, default=30)
@@ -32,14 +33,21 @@ if __name__ == '__main__':
     if args.device == 'cuda' and torch.cuda.is_available() is False:
         raise EnvironmentError("CUDA is unavailable")
 
+    device = torch.device(args.device)
     if args.dim == 'time':
         net = model.TemporalAttentionNet(
-
-        )
+            in_channel=args.channel,
+            sequence_lens=args.sequences_lens,
+            time_lens=args.time_lens,
+            hidden_size=256
+        ).to(device)
     elif args.dim == 'space':
         net = model.SpacialAttentionNet(
-
-        )
+            in_channel=args.channel,
+            sequence_lens=args.sequences_lens,
+            time_lens=args.time_lens,
+            hidden_size=256
+        ).to(device)
     else:
         raise ValueError("Undefined Dimension")
 
@@ -48,11 +56,11 @@ if __name__ == '__main__':
 
     ndata = np.load(args.data)
     nlabel = np.load(args.label)
-
     nlabel = nlabel.reshape(-1, 1)
     train_loader, test_loader = load_data.boost_dataloader(ndata, nlabel,
                                                            batch_size=args.batch_size,
-                                                           test_size=args.train_test_split)
+                                                           test_size=args.train_test_split,
+                                                           peace=False)
     writer = SummaryWriter("runs/" + args.dim + str(datetime.datetime.now()))
     epoch = args.epoch
     print('<<=== Begin ===>>')
@@ -60,7 +68,6 @@ if __name__ == '__main__':
         train_correct = train_total = 0
         test_correct = test_total = 0
         train_loss = test_loss = 0
-
         net.train()
         print("<< ========TRAIN ============== >>")
         for input, label in train_loader:
@@ -73,7 +80,6 @@ if __name__ == '__main__':
             train_correct += (train_prediction == label).sum().float()
             train_total += len(label)
 
-            print(label.shape, torch.sum(label), torch.sum(train_prediction))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -91,19 +97,20 @@ if __name__ == '__main__':
             test_f1score = f1_score(label.cpu().numpy(), test_prediction.cpu().numpy(), average='binary')
             test_total += len(label)
 
-            print(label.shape, torch.sum(label), torch.sum(test_prediction))
-
-        print('EPOCH :{:}  loss : {:.5}/{:.5}  acc:{:.3}/{:.3}, f1-score:{:.3}'.format(i, train_loss, test_loss, train_correct/train_total, test_correct / test_total, test_f1score))
+        print('EPOCH :{:}  loss : {:.5}/{:.5}  acc:{:.3}/{:.3}, f1-score:{:.3}'.format(i, train_loss, test_loss,
+                                                                                       train_correct / train_total,
+                                                                                       test_correct / test_total,
+                                                                                       test_f1score))
         writer.add_scalar('loss/train', train_loss, i)
         writer.add_scalar('loss/test', test_loss, i)
-        writer.add_scalar('accuracy/train', train_correct/train_total, i)
-        writer.add_scalar('accuracy/test', test_correct/test_total, i)
+        writer.add_scalar('accuracy/train', train_correct / train_total, i)
+        writer.add_scalar('accuracy/test', test_correct / test_total, i)
 
     writer.close()
     print('<<=== Finish ===>>')
     state = {
-        'net':net.state_dict(),
-        'opt':optimizer.state_dict(),
+        'net': net.state_dict(),
+        'opt': optimizer.state_dict(),
     }
     torch.save(state, args.save_path + '.pth')
     print('<<=== Param Saved ===>>')
