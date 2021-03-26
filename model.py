@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchsummary import summary
 
 
 class ResidualBlock1d(nn.Module):
@@ -113,7 +112,12 @@ class PureCNN(nn.Module):
         self.block1 = ResidualBlock1d(residual_channel, 3, padding=1)
         self.block2 = ResidualBlock1d(residual_channel, 3, padding=1)
         self.block3 = ResidualBlock1d(residual_channel, 3, padding=1)
-        self.block4 = nn.Conv1d(in_channels=residual_channel, out_channels=2, kernel_size=3, stride=1)
+        self.block4 = ResidualBlock1d(residual_channel, 3, padding=1)
+        self.block5 = ResidualBlock1d(residual_channel, 3, padding=1)
+        self.block6 = ResidualBlock1d(residual_channel, 3, padding=1)
+        self.block7 = ResidualBlock1d(residual_channel, 3, padding=1)
+        self.block8 = ResidualBlock1d(residual_channel, 3, padding=1)
+        self.block9 = nn.Conv1d(in_channels=residual_channel, out_channels=2, kernel_size=3, stride=1)
 
         self.feature_size = self._adaptive_feature_size()
         self.fn1 = nn.Linear(self.feature_size, fully_unit)
@@ -133,6 +137,11 @@ class PureCNN(nn.Module):
         x = self.block2(x)
         x = self.block3(x)
         x = self.block4(x)
+        x = self.block5(x)
+        x = self.block6(x)
+        x = self.block7(x)
+        x = self.block8(x)
+        x = self.block9(x)
 
         x = x.view(-1, self.feature_size)
         x = F.relu(self.fn1(x))
@@ -147,10 +156,15 @@ class PureCNN(nn.Module):
         x = self.block2(x)
         x = self.block3(x)
         x = self.block4(x)
+        x = self.block5(x)
+        x = self.block6(x)
+        x = self.block7(x)
+        x = self.block8(x)
+        x = self.block9(x)
         return x.view(-1).shape[0]
 
 
-class ConvLSTM_init(nn.Module):
+class BCINet_init(nn.Module):
 
     def __init__(
             self,
@@ -164,7 +178,7 @@ class ConvLSTM_init(nn.Module):
             layer_size=1,
             bidirectional=False
     ):
-        super(ConvLSTM_init, self).__init__()
+        super(BCINet_init, self).__init__()
 
         if sequence_lens % time_lens != 0:
             raise ValueError("Invalid time lens")
@@ -188,12 +202,13 @@ class ConvLSTM_init(nn.Module):
             self.layer_size *= 2
         self.fn = nn.Linear(hidden_size * self.layer_size, output_size)
 
-    def forward(self, x, px):
+    def forward(self, x):
         batch_size = x.shape[0]
 
-        px = self.emdnet(px)
+        px = self.emdnet(x[1])
         px = self.emdlinear(F.relu(px, inplace=True))
 
+        x = x[0]
         x = x.chunk(self.time_lens, 2)
         x = torch.stack(x, 1)
         x = x.reshape(batch_size * self.time_lens, self.in_channel, self.window_size)
@@ -216,7 +231,7 @@ class ConvLSTM_init(nn.Module):
         return self.subconv(x).view(-1).shape[0], self.emdnet(px).view(-1).shape[0]
 
 
-class ConvLSTM_embedding(nn.Module):
+class BCINet_concat(nn.Module):
 
     def __init__(
             self,
@@ -230,7 +245,7 @@ class ConvLSTM_embedding(nn.Module):
             layer_size=1,
             bidirectional=False
     ):
-        super(ConvLSTM_embedding, self).__init__()
+        super(BCINet_concat, self).__init__()
 
         if sequence_lens % time_lens != 0:
             raise ValueError("Invalid time lens")
@@ -253,11 +268,11 @@ class ConvLSTM_embedding(nn.Module):
             self.layer_size *= 2
         self.fn = nn.Linear(hidden_size * self.layer_size, output_size)
 
-    def forward(self, x, px):
+    def forward(self, x):
         batch_size = x.shape[0]
 
-        px = self.emdnet(px)
-        # px = px.repeat(batch_size)
+        px = self.emdnet(x[1])
+        x = x[0]
 
         x = x.chunk(self.time_lens, 2)
         x = torch.stack(x, 1)

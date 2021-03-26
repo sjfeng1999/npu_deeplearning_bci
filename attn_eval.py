@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,7 +8,6 @@ import utils
 import load_data
 import datetime
 import model
-from sklearn.preprocessing import normalize
 
 seed = 0
 utils.set_random_seed(seed)
@@ -65,8 +64,10 @@ def get_single_attention(index, ndata=None):
 
 
 if __name__ == '__main__':
-    device = torch.device('cuda')
-    PATH = '/home/willer/Desktop/Development/Python/MyRepo/npu-deeplearning-bci/model/'
+    parse = argparse.ArgumentParser()
+    parse.add_argument('-data', type=str, required=True)
+    parse.add_argument('-dim', type=str, required=True)
+    parse.add_argument('-model_path', type=str, required=True)
 
     ndata, nlabel = load_data.get_grazdata()
     train_loader, test_loader = load_data.get_dataloader_graz()

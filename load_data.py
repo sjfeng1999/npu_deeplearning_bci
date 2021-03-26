@@ -24,10 +24,13 @@ def label_map(x, pos=0, classes=2):
         return [0, 1]
 
 
-def boost_dataloader(data, label, batch_size=128, test_size=0.20):
+def boost_dataloader(data, label, batch_size=128, test_size=0.20, peace=False):
     train_data, test_data, train_label, test_label = train_test_split(data, label, test_size=test_size)
-    train_set = MyDataset(train_data, train_label)
-    test_set = MyDataset(test_data, test_label)
+    if peace is False:
+        train_set = MyDataset(train_data, train_label)
+        test_set = MyDataset(test_data, test_label)
+    else:
+        pass
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True)

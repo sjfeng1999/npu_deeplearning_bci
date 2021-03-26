@@ -1,16 +1,20 @@
 import random
 import numpy as np
+import signal
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # import pyeeg
 # import pywt
 
+
 def softmax(x):
     x = x - np.max(x)
     exp_x = np.exp(x)
     x = exp_x / np.sum(exp_x)
     return x
+
 
 def set_random_seed(seed=0):
     random.seed(seed)
@@ -19,6 +23,63 @@ def set_random_seed(seed=0):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
 
+
+def npu_confused_data_convertion(PATH_CONFUSE):
+    confused_list = ['confused', 'think-right']
+    nonconfused_list = ['non-confused', 'guess']
+
+    total_data = []
+    total_label = []
+    for i in range(2, 26):
+        if i == 6:
+            continue
+        dir_name = 'subject_{}'.format(i)
+
+        confused_data = []
+        nonconfused_data = []
+        label = []
+        for p in confused_list:
+            subdir = os.path.join(PATH_CONFUSE, dir_name, p)
+            try:
+                for subf in os.listdir(subdir):
+                    with open(os.path.join(subdir, subf)) as fdata:
+                        tdata = np.vstack([np.array([float(signal) for signal in line[:-1].split(',')]) for line in fdata])
+                    time_lens = tdata.shape[0] // 600
+                    format_data = np.array([tdata[_i * 600:(_i + 1) * 600, :] for _i in range(time_lens)])
+                    confused_data.append(format_data)
+                    label += [1] * time_lens
+                    # total_data.append(format_data)
+                    # total_label += [1] * time_lens
+            except:
+                print('miss file === ', subdir)
+
+        for p in nonconfused_list:
+            subdir = os.path.join(PATH_CONFUSE, dir_name, p)
+            try:
+                for subf in os.listdir(subdir):
+                    with open(os.path.join(subdir, subf)) as fdata:
+                        tdata = np.vstack([np.array([float(signal) for signal in line[:-1].split(',')]) for line in fdata])
+                    time_lens = tdata.shape[0] // 600
+                    format_data = np.array([tdata[_i * 600:(_i + 1) * 600, :] for _i in range(time_lens)])
+                    nonconfused_data.append(format_data)
+                    label += [0] * time_lens
+                    # total_data.append(format_data)
+                    # total_label += [0] * time_lens
+            except:
+                print('miss file === ', subdir)
+
+        peace_data = os.path.join(PATH_CONFUSE, dir_name, 'rest', 'non-confused.txt')
+        with open(peace_data) as fdata:
+            tdata = np.vstack([np.array([float(signal) for signal in line[:-1].split(',')]) for line in fdata])
+        nppeace_data = tdata[:25000, :]
+
+        nplabel = np.array(label)
+        npconfused_data = np.vstack(confused_data)
+        npnonconfused_data = np.vstack(nonconfused_data)
+
+        np.save(PATH_CONFUSE + dir_name + '_confused.npy', npconfused_data)
+        np.save(PATH_CONFUSE + dir_name + '_nonconfused.npy', npnonconfused_data)
+        np.save(PATH_CONFUSE + dir_name + '_peace.npy', nppeace_data)
 
 
 def freq_filter(data):
@@ -46,6 +107,7 @@ def freq_filter(data):
     new_data = np.array([theta, alpha, beta])
     return new_data
 
+
 def wavelet_transform(data):
     coeffs = pywt.wavedec(data, 'db4',level=4)
     cA,cB,cC,cD,cE = coeffs
@@ -62,6 +124,7 @@ def wavelet_transform(data):
     t = np.sum(z[:, 58:94, :], axis=1)
     data = np.concatenate((h, b, p, t), 0)
     return data
+
 
 def freq_filter_shorttime(data, channel=3, sequence=1000):
     """
